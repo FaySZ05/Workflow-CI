@@ -1,0 +1,25 @@
+name: CI MLflow
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true # Downloads your 375MB CSV
+
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7"
+
+      - name: Install dependencies from conda.yaml
+        run: |
+          python -m pip install --upgrade pip
+          pip install mlflow pandas scikit-learn 
+
+      - name: Run MLflow Project
+        run: mlflow run ./MLProject --no-conda
