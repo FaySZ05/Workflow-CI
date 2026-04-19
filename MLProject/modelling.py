@@ -101,7 +101,7 @@ def build_sequence_splits(df: pd.DataFrame, look_back: int, test_size: float):
 
 def train_linear_regression(X_train, X_test, y_train, y_test, experiment_id: str):
     mlflow.sklearn.autolog(log_models=True)
-    with mlflow.start_run(run_name="LinearRegression", experiment_id=experiment_id):
+    with mlflow.start_run(run_name="LinearRegression", experiment_id=experiment_id, nested=True)):
         model = LinearRegression()
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
@@ -118,7 +118,7 @@ def train_linear_regression(X_train, X_test, y_train, y_test, experiment_id: str
 
 def train_random_forest(X_train, X_test, y_train, y_test, experiment_id: str):
     mlflow.sklearn.autolog(log_models=True)
-    with mlflow.start_run(run_name="RandomForestRegressor", experiment_id=experiment_id):
+    with mlflow.start_run(run_name="RandomForestRegressor", experiment_id=experiment_id, nested=True)):
         model = RandomForestRegressor(random_state=42)
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
@@ -141,7 +141,7 @@ def train_lstm(
     experiment_id: str,
 ):
     mlflow.tensorflow.autolog(log_models=True)
-    with mlflow.start_run(run_name="LSTM", experiment_id=experiment_id):
+    with mlflow.start_run(run_name="LSTM", experiment_id=experiment_id, nested=True)):
         n_features = X_train_seq.shape[2]
 
         model = Sequential([
@@ -186,15 +186,19 @@ def train_lstm(
 # ---------------------------------------------------------------------------
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
+    # Ensure the mlruns directory exists so SQLite doesn't fail
+    if not os.path.exists("mlruns"):
+        os.makedirs("mlruns")
+        
     mlflow.set_tracking_uri(db_path)
+    
     exp = mlflow.get_experiment_by_name(experiment_name)
     if exp is None:
         exp_id = mlflow.create_experiment(experiment_name)
     else:
         exp_id = exp.experiment_id
+    
     mlflow.set_experiment(experiment_name)
-    print(f"MLflow tracking URI : {db_path}")
-    print(f"Experiment          : {experiment_name}  (id={exp_id})")
     return exp_id
 
 
@@ -227,6 +231,19 @@ def parse_args():
 
 def main():
     args = parse_args()
+    exp_id = setup_mlflow(args.mlflow_db, args.experiment)
+    
+    df = load_data(args.data_file, args.max_samples)
+    
+    # Run Scikit-learn models
+    X_train, X_test, y_train, y_test = build_flat_splits(df, args.test_size)
+    print(f"Flat splits — train: {X_train.shape}  test: {X_test.shape}")
+    train_linear_regression(X_train, X_test, y_train, y_test, exp_id)
+    train_random_forest(X_train, X_test, y_train, y_test, exp_id)
+    
+    # Run LSTM
+    X_tr_s, X_te_s, y_tr_s, y_te_s, sc, h_idx = build_sequence_splits(df, args.look_back, args.test_size)
+    train_lstm(X_tr_s, X_te_s, y_tr_s, y_te_s, sc, h_idx, args.look_back, args.epochs, args.batch_size, exp_id)
 
     # ── MLflow ──────────────────────────────────────────────────────────────
     os.makedirs("mlruns", exist_ok=True)
