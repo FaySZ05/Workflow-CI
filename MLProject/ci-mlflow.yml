@@ -36,10 +36,10 @@ jobs:
           pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2 pandas scikit-learn
 
       # 4. Run MLflow Project pointing to your folder
-      - name: Run MLflow Project
+      - name: Run Model Directly
         run: |
-          export MLFLOW_TRACKING_URI=sqlite:///mlflow.db
-          mlflow run ./MLProject --env-manager=local
+          cd MLProject
+          python modelling.py --data_file bitcoinhistoricaldata_raw.csv --mlflow_db sqlite:///mlflow.db
       
       # 5. Get latest run_id (Assuming default experiment '0')
       - name: Get latest MLflow run_id
