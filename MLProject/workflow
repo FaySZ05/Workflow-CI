@@ -1,0 +1,25 @@
+name: CI MLflow
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12.7"
+
+      - name: Install MLflow
+        run: pip install mlflow
+
+      - name: Run MLflow Project
+        # We DON'T use --no-conda here, so MLflow will create the env from your conda.yaml
+        run: mlflow run ./MLProject
