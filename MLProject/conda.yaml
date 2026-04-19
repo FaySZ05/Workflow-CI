@@ -42,8 +42,4 @@ jobs:
 
       # 4. Run MLflow Project
       - name: Run MLflow Project
-        run: |
-          mlflow run ./MLProject \
-          -P csv_url=$CSV_URL \
-          -P alpha=$ALPHA \
-          -P l1_ratio=$L1_RATIO
+        run: mlflow run ./MLProject --no-conda
