@@ -1,0 +1,7 @@
+name: Bitcoin_Analysis
+conda_env: conda.yaml 
+entry_points:
+  main:
+    parameters:
+      csv_url: {type: string, default: "../preprocessing/bitcoinhistoricaldata_raw.csv"}
+    command: "python train.py --csv_url {csv_url}"
