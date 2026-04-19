@@ -1,5 +1,5 @@
-name: Bitcoin_Modelling
+name: Bitcoin_Price_Prediction
 conda_env: conda.yaml
 entry_points:
   main:
-    command: "python modelling.py"
+    command: "python modelling.py --data_file bitcoinhistoricaldata_raw.csv"
