@@ -42,4 +42,4 @@ jobs:
 
       # 4. Run MLflow Project
       - name: Run MLflow Project
-        mlflow run ./MLProject --no-conda
+        run: mlflow run ./MLProject --no-conda
