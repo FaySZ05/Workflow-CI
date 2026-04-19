@@ -23,5 +23,4 @@ jobs:
           pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2
 
       - name: Run MLflow Project
-        # We use --no-conda because we just manually built the environment
         run: mlflow run ./MLProject --no-conda
