@@ -3,10 +3,10 @@ name: CI MLflow
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
  
 env:
   CSV_URL: "bitcoinhistoricaldata_raw.csv"
