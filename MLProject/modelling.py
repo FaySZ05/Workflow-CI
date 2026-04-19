@@ -140,16 +140,13 @@ def train_lstm(X_train_seq, X_test_seq, y_train_seq, y_test_seq, scaler, high_id
 # ---------------------------------------------------------------------------
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
-    mlflow.set_tracking_uri(db_path)
-    exp = mlflow.get_experiment_by_name(experiment_name)
-    if exp is None:
-        exp_id = mlflow.create_experiment(experiment_name)
-    else:
-        exp_id = exp.experiment_id
+    # Only set the tracking URI if we aren't already in an active run
+    if not mlflow.active_run():
+        mlflow.set_tracking_uri(db_path)
+    
     mlflow.set_experiment(experiment_name)
-    print(f"MLflow tracking URI : {db_path}")
-    print(f"Experiment          : {experiment_name}  (id={exp_id})")
-    return exp_id
+    exp = mlflow.get_experiment_by_name(experiment_name)
+    return exp.experiment_id
 
 def parse_args():
     parser = argparse.ArgumentParser()
