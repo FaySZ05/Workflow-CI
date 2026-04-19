@@ -118,7 +118,7 @@ def train_linear_regression(X_train, X_test, y_train, y_test, experiment_id: str
 
 def train_random_forest(X_train, X_test, y_train, y_test, experiment_id: str):
     mlflow.sklearn.autolog(log_models=True)
-    with mlflow.start_run(run_name="RandomForestRegressor", experiment_id=experiment_id, nested=True)):
+    with mlflow.start_run(run_name="RandomForestRegressor", experiment_id=experiment_id, nested=True):
         model = RandomForestRegressor(random_state=42)
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
@@ -141,7 +141,7 @@ def train_lstm(
     experiment_id: str,
 ):
     mlflow.tensorflow.autolog(log_models=True)
-    with mlflow.start_run(run_name="LSTM", experiment_id=experiment_id, nested=True)):
+    with mlflow.start_run(run_name="LSTM", experiment_id=experiment_id, nested=True):
         n_features = X_train_seq.shape[2]
 
         model = Sequential([
