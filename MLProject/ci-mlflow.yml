@@ -9,16 +9,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: true # Downloads your 375MB bitcoinhistoricaldata_raw.csv
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Set up Python 3.12.13
+        uses: actions/setup-python@v5
         with:
-          auto-update-conda: true
-          python-version: "3.12.7"
+          python-version: "3.12.13"
 
-      - name: Install MLflow
-        run: pip install mlflow
+      - name: Install dependencies from your conda.yaml
+        run: |
+          python -m pip install --upgrade pip==24.1.2
+          # Installing the specific versions from your conda.yaml
+          pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2
 
       - name: Run MLflow Project
+        # We use --no-conda because we just manually built the environment
         run: mlflow run ./MLProject --no-conda
