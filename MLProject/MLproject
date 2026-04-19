@@ -2,6 +2,4 @@ name: Bitcoin_Modelling
 conda_env: conda.yaml
 entry_points:
   main:
-    parameters:
-      csv_url: {type: string, default: "bitcoinhistoricaldata_raw.csv"}
-    command: "python modelling.py {csv_url}"
+    command: "python modelling.py"
