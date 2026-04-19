@@ -36,8 +36,9 @@ jobs:
           pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2 pandas scikit-learn
 
       # 4. Run MLflow Project pointing to your folder
-      - name: Run mlflow project
+      - name: Run MLflow Project
         run: |
+          export MLFLOW_TRACKING_URI=sqlite:///mlflow.db
           mlflow run ./MLProject --env-manager=local
       
       # 5. Get latest run_id (Assuming default experiment '0')
