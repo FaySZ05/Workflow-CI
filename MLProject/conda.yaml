@@ -43,4 +43,11 @@ jobs:
       # Run as a mlflow project
       - name: Run MLProject
         run: |
-          mlflow run MLProject --env-manager=local 
+          mlflow run . --env-manager=local 
+
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true 
+  
