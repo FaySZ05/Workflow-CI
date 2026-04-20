@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 name: bitcoin-price-prediction
 
 conda_env: conda.yaml
@@ -7,3 +8,10 @@ entry_points:
     parameters:
       data_file: {type: path, default: "bitcoinhistoricaldata_raw.csv"}
     command: "python modelling.py --data_file {data_file}"
+=======
+name: Bitcoin_Price_Prediction
+conda_env: conda.yaml
+entry_points:
+  main:
+    command: "python modelling.py --data_file bitcoinhistoricaldata_raw.csv"
+>>>>>>> a70eeae81b5fcad910a83fcfd504cef2387ca892
