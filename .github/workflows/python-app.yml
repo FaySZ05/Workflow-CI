@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: true # Crucial for your 900MB CSV
 
       - name: Set up Python 3.12.7
         uses: actions/setup-python@v5
@@ -25,17 +25,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip==24.1.2
-          pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2 pandas scikit-learn
-
-      - name: Make MLProject a git worktree (for MLflow)
-        run: |
-          # MLflow uses GitPython and expects the project directory itself to look like a git repo.
-          # Create a .git "gitdir:" file pointing at the real repo metadata.
-          echo "gitdir: $GITHUB_WORKSPACE/.git" > Workflow-CI/.github/workflows/.git
+          python -m pip install --upgrade pip
+          pip install mlflow tensorflow numpy cloudpickle pandas scikit-learn
 
       - name: Run MLflow project
-        run: mlflow run ./Workflow-CI/MLProject --env-manager=local -P data_file=./Workflow-CI/MLProject/preprocessed_bitcoin_data.csv
+        # Fixed path: Assuming MLProject is in the root of your repo based on your previous commands
+        run: |
+          mlflow run ./MLProject --env-manager=local -P data_file=./MLProject/preprocessed_bitcoin_data.csv
 
       - name: Get latest MLflow run id
         run: |
@@ -43,19 +39,36 @@ jobs:
           import os
           from mlflow.tracking import MlflowClient
 
-          db_path = os.path.join(os.getcwd(), "Workflow-CI", "MLProject", "mlruns", "mlflow.db")
+          # Fixed path: mlruns is usually created where the command is run
+          db_path = os.path.join(os.getcwd(), "mlruns", "mlflow.db")
+          
+          # If you haven't configured a SQL backend, MLflow defaults to local file storage
+          # If you don't see a .db file, you might need to search the directory instead
           if not os.path.isfile(db_path):
-              raise SystemExit(f"MLflow database not found at {db_path}")
-          uri = "sqlite:///" + db_path.replace(os.sep, "/")
+              print(f"Warning: MLflow sqlite db not found at {db_path}, checking default mlruns...")
+              uri = "file://" + os.path.join(os.getcwd(), "mlruns")
+          else:
+              uri = "sqlite:///" + db_path.replace(os.sep, "/")
+          
           client = MlflowClient(tracking_uri=uri)
           exp = client.get_experiment_by_name("Bitcoin Price Prediction")
+          
           if exp is None:
-              raise SystemExit("Experiment 'Bitcoin Price Prediction' not found")
-          runs = client.search_runs([exp.experiment_id], max_results=500)
+              # Fallback: List all experiments if the name doesn't match exactly
+              exps = client.search_experiments()
+              if exps:
+                  exp = exps[0]
+                  print(f"Using first available experiment: {exp.name}")
+              else:
+                  raise SystemExit("No experiments found")
+
+          runs = client.search_runs([exp.experiment_id])
           if not runs:
               raise SystemExit("No runs found in experiment")
+          
           latest = max(runs, key=lambda r: r.info.start_time)
           run_id = latest.info.run_id
+          
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
               f.write(f"RUN_ID={run_id}\n")
           print(f"Latest run_id: {run_id}")
