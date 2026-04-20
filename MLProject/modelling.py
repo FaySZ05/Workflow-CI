@@ -45,6 +45,41 @@ TARGET = "High"
 # Data loading & preprocessing
 # ---------------------------------------------------------------------------
 
+def _is_lfs_pointer_file(path: str) -> bool:
+    try:
+        with open(path, "rb") as f:
+            head = f.read(200)
+        return b"git-lfs.github.com/spec/v1" in head
+    except OSError:
+        return False
+
+
+def load_data(data_file: str, max_samples: int) -> pd.DataFrame:
+    """
+    Load the dataset from CSV.
+
+    In CI, the repository may be checked out without Git LFS objects (e.g. due to LFS quota limits).
+    In that case, `data_file` may exist but be a Git LFS pointer file; we fall back to synthetic data
+    so the pipeline can still run.
+    """
+    if (not data_file) or (not os.path.exists(data_file)) or _is_lfs_pointer_file(data_file):
+        print(
+            f"Warning: data file '{data_file}' missing or unavailable (LFS pointer). "
+            "Falling back to synthetic data for CI."
+        )
+        rng = np.random.default_rng(42)
+        X = rng.normal(size=(5000, 4))
+        y = X @ np.array([0.4, -0.2, 0.1, 0.05]) + rng.normal(scale=0.1, size=(5000,))
+        df = pd.DataFrame(X, columns=["Open", "Low", "Close", "Volume"])
+        df["High"] = y
+        return df.head(max_samples) if max_samples else df
+
+    df = pd.read_csv(data_file)
+    if max_samples and len(df) > max_samples:
+        df = df.head(max_samples).copy()
+    return df
+
+
 def build_flat_splits(df: pd.DataFrame, test_size: float):
     """Build flat (non-sequential) train/test splits for sklearn models."""
     X = df[["Open", "Low", "Close", "Volume"]]
@@ -169,12 +204,8 @@ def train_lstm(
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
     mlflow.set_tracking_uri(db_path)
-<<<<<<< HEAD
-    # `mlflow run` sets MLFLOW_RUN_ID for the project entrypoint run in the
-    # project backend. This script uses an explicit sqlite URI, so that run id
-    # is not present here and start_run() would raise RESOURCE_DOES_NOT_EXIST.
-=======
->>>>>>> a70eeae81b5fcad910a83fcfd504cef2387ca892
+    # `mlflow run` may set MLFLOW_RUN_ID / MLFLOW_PARENT_RUN_ID for the backend run.
+    # We create our own runs in this script, so clear these to avoid RESOURCE_DOES_NOT_EXIST.
     for _env in ("MLFLOW_RUN_ID", "MLFLOW_PARENT_RUN_ID"):
         os.environ.pop(_env, None)
 
