@@ -1,4 +1,4 @@
-name: CI/CD MLflow
+name: CI MLflow
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
         run: |
           # MLflow uses GitPython and expects the project directory itself to look like a git repo.
           # Create a .git "gitdir:" file pointing at the real repo metadata.
-          echo "gitdir: $GITHUB_WORKSPACE/.git" > Workflow-CI/MLProject/.git
+          echo "gitdir: $GITHUB_WORKSPACE/.git" > Workflow-CI/.github/workflows/.git
 
       - name: Run MLflow project
         run: mlflow run ./Workflow-CI/MLProject --env-manager=local -P data_file=./Workflow-CI/MLProject/preprocessed_bitcoin_data.csv
