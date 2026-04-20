@@ -8,6 +8,8 @@ All runs are tracked with MLflow.
 import os
 import gc
 import argparse
+from typing import Sequence
+
 import numpy as np
 import pandas as pd
 import mlflow
@@ -15,9 +17,14 @@ import mlflow.sklearn
 import mlflow.tensorflow
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
+
+from modelling_tuning import (
+    load_dataframe,
+    ohlcv_sequence_columns,
+    prepare_sequence_data,
+    prepare_tabular_regression,
+)
 
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -37,62 +44,8 @@ DEFAULT_TEST_SIZE = 0.2
 MLFLOW_DB_PATH = "sqlite:///mlruns/mlflow.db"
 EXPERIMENT_NAME = "Bitcoin Price Prediction"
 
-FEATURES = ["Open", "High", "Low", "Close", "Volume"]
+TABULAR_FEATURES = ["Open", "Low", "Close", "Volume"]
 TARGET = "High"
-
-
-# ---------------------------------------------------------------------------
-# Data loading & preprocessing
-# ---------------------------------------------------------------------------
-
-def load_data(data_file: str, max_samples: int) -> pd.DataFrame:
-    """Load and clean the raw CSV data."""
-    df = pd.read_csv(data_file)
-
-    # Normalise volume column name (dataset uses 'Volume_(BTC)' in some versions)
-    if "Volume_(BTC)" in df.columns and "Volume" not in df.columns:
-        df = df.rename(columns={"Volume_(BTC)": "Volume"})
-
-    df = df[FEATURES].dropna()
-
-    if len(df) > max_samples:
-        df = df.head(max_samples)
-        print(f"Dataset truncated to {max_samples} rows.")
-
-    print(f"Data loaded: {df.shape[0]} rows × {df.shape[1]} columns")
-    return df
-
-
-def build_flat_splits(df: pd.DataFrame, test_size: float):
-    """Build flat (non-sequential) train/test splits for sklearn models."""
-    X = df[["Open", "Low", "Close", "Volume"]]
-    y = df[TARGET]
-    return train_test_split(X, y, test_size=test_size, random_state=42)
-
-
-def create_sequences(scaled: np.ndarray, look_back: int, high_idx: int):
-    """Convert a 2-D scaled array into (X_seq, y_seq) for sequence models."""
-    X_seq, y_seq = [], []
-    for i in range(len(scaled) - look_back):
-        X_seq.append(scaled[i : i + look_back])
-        y_seq.append(scaled[i + look_back, high_idx])
-    return np.array(X_seq), np.array(y_seq)
-
-
-def build_sequence_splits(df: pd.DataFrame, look_back: int, test_size: float):
-    """Scale data and build sequential train/test splits for LSTM."""
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled = scaler.fit_transform(df[FEATURES].values)
-
-    high_idx = FEATURES.index(TARGET)
-    X_seq, y_seq = create_sequences(scaled, look_back, high_idx)
-
-    split = int(len(X_seq) * (1 - test_size))
-    return (
-        X_seq[:split], X_seq[split:],
-        y_seq[:split], y_seq[split:],
-        scaler, high_idx,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -137,12 +90,14 @@ def train_lstm(
     X_train_seq, X_test_seq,
     y_train_seq, y_test_seq,
     scaler, high_idx: int,
+    inverse_columns: Sequence[str],
     look_back: int, epochs: int, batch_size: int,
     experiment_id: str,
 ):
     mlflow.tensorflow.autolog(log_models=True)
     with mlflow.start_run(run_name="LSTM", experiment_id=experiment_id):
         n_features = X_train_seq.shape[2]
+        n_cols = len(inverse_columns)
 
         model = Sequential([
             LSTM(50, activation="relu", input_shape=(look_back, n_features)),
@@ -162,7 +117,7 @@ def train_lstm(
         y_pred_scaled = model.predict(X_test_seq)
 
         def inverse_single_col(arr_1d):
-            dummy = np.zeros((len(arr_1d), len(FEATURES)))
+            dummy = np.zeros((len(arr_1d), n_cols))
             dummy[:, high_idx] = arr_1d
             return scaler.inverse_transform(dummy)[:, high_idx]
 
@@ -187,15 +142,6 @@ def train_lstm(
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
     mlflow.set_tracking_uri(db_path)
-<<<<<<< HEAD
-    # `mlflow run` sets MLFLOW_RUN_ID for the project entrypoint run in the
-    # project backend. This script uses an explicit sqlite URI, so that run id
-    # is not present here and start_run() would raise RESOURCE_DOES_NOT_EXIST.
-=======
->>>>>>> a70eeae81b5fcad910a83fcfd504cef2387ca892
-    for _env in ("MLFLOW_RUN_ID", "MLFLOW_PARENT_RUN_ID"):
-        os.environ.pop(_env, None)
-
     exp = mlflow.get_experiment_by_name(experiment_name)
     if exp is None:
         exp_id = mlflow.create_experiment(experiment_name)
@@ -241,11 +187,19 @@ def main():
     os.makedirs("mlruns", exist_ok=True)
     exp_id = setup_mlflow(args.mlflow_db, args.experiment)
 
-    # ── Data ────────────────────────────────────────────────────────────────
-    df = load_data(args.data_file, args.max_samples)
+    # ── Data (same preprocessing as modelling_tuning.py) ────────────────────
+    df = load_dataframe(args.data_file)
 
-    # Flat splits (sklearn models)
-    X_train, X_test, y_train, y_test = build_flat_splits(df, args.test_size)
+    tabular = prepare_tabular_regression(
+        df,
+        feature_cols=TABULAR_FEATURES,
+        target_col=TARGET,
+        max_samples=args.max_samples,
+        test_size=args.test_size,
+        random_state=42,
+    )
+    X_train, X_test = tabular.X_train, tabular.X_test
+    y_train, y_test = tabular.y_train, tabular.y_test
     print(f"Flat splits  — train: {X_train.shape}  test: {X_test.shape}")
 
     # ── Train sklearn models ─────────────────────────────────────────────────
@@ -258,21 +212,36 @@ def main():
 
     # ── Train LSTM ──────────────────────────────────────────────────────────
     if not args.skip_lstm:
-        (X_train_seq, X_test_seq,
-         y_train_seq, y_test_seq,
-         scaler, high_idx) = build_sequence_splits(df, args.look_back, args.test_size)
+        seq_cols = ohlcv_sequence_columns(df)
+        if len(seq_cols) >= 2 and TARGET in seq_cols:
+            seq_data = prepare_sequence_data(
+                df,
+                features=seq_cols,
+                target_feature=TARGET,
+                look_back=args.look_back,
+                max_samples=args.max_samples,
+                train_fraction=1.0 - args.test_size,
+            )
+            high_idx = list(seq_data.features).index(TARGET)
+            inv_cols = list(seq_data.features)
 
-        print(f"Sequence splits — train: {X_train_seq.shape}  test: {X_test_seq.shape}")
+            print(f"Sequence splits — train: {seq_data.X_train_seq.shape}  test: {seq_data.X_test_seq.shape}")
 
-        train_lstm(
-            X_train_seq, X_test_seq,
-            y_train_seq, y_test_seq,
-            scaler, high_idx,
-            look_back=args.look_back,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            experiment_id=exp_id,
-        )
+            train_lstm(
+                seq_data.X_train_seq, seq_data.X_test_seq,
+                seq_data.y_train_seq, seq_data.y_test_seq,
+                seq_data.scaler, high_idx,
+                inverse_columns=inv_cols,
+                look_back=args.look_back,
+                epochs=args.epochs,
+                batch_size=args.batch_size,
+                experiment_id=exp_id,
+            )
+        else:
+            print(
+                "Skipping LSTM: need OHLCV columns for sequences; "
+                f"got {seq_cols}. Align CSV with modelling_tuning preprocessing."
+            )
     else:
         print("Skipping LSTM training (--skip_lstm flag set).")
 
