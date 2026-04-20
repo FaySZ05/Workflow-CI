@@ -187,6 +187,12 @@ def train_lstm(
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
     mlflow.set_tracking_uri(db_path)
+    # `mlflow run` sets MLFLOW_RUN_ID for the project entrypoint run in the
+    # project backend. This script uses an explicit sqlite URI, so that run id
+    # is not present here and start_run() would raise RESOURCE_DOES_NOT_EXIST.
+    for _env in ("MLFLOW_RUN_ID", "MLFLOW_PARENT_RUN_ID"):
+        os.environ.pop(_env, None)
+
     exp = mlflow.get_experiment_by_name(experiment_name)
     if exp is None:
         exp_id = mlflow.create_experiment(experiment_name)
