@@ -28,8 +28,14 @@ jobs:
           python -m pip install --upgrade pip==24.1.2
           pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2 pandas scikit-learn
 
+      - name: Make MLProject a git worktree (for MLflow)
+        run: |
+          # MLflow uses GitPython and expects the project directory itself to look like a git repo.
+          # Create a .git "gitdir:" file pointing at the real repo metadata.
+          echo "gitdir: $GITHUB_WORKSPACE/.git" > Workflow-CI/MLProject/.git
+
       - name: Run MLflow project
-        run: mlflow run ./Workflow-CI/MLProject --env-manager=local -P data_file=preprocessed_bitcoin_data.csv
+        run: mlflow run ./Workflow-CI/MLProject --env-manager=local -P data_file=./Workflow-CI/MLProject/preprocessed_bitcoin_data.csv
 
       - name: Get latest MLflow run id
         run: |
