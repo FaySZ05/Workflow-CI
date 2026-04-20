@@ -29,7 +29,7 @@ jobs:
           pip install mlflow==3.11.1 tensorflow==2.19.0 numpy==2.0.2 cloudpickle==3.1.2 pandas scikit-learn
 
       - name: Run MLflow project
-        run: mlflow run ./MLProject --env-manager=local
+        run: mlflow run ./Workflow-CI/MLProject --env-manager=local -P data_file=preprocessed_bitcoin_data.csv
 
       - name: Get latest MLflow run id
         run: |
@@ -37,7 +37,7 @@ jobs:
           import os
           from mlflow.tracking import MlflowClient
 
-          db_path = os.path.join(os.getcwd(), "MLProject", "mlruns", "mlflow.db")
+          db_path = os.path.join(os.getcwd(), "Workflow-CI", "MLProject", "mlruns", "mlflow.db")
           if not os.path.isfile(db_path):
               raise SystemExit(f"MLflow database not found at {db_path}")
           uri = "sqlite:///" + db_path.replace(os.sep, "/")
