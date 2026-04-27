@@ -18,10 +18,10 @@ jobs:
         with:
           lfs: true # Crucial for your 900MB CSV
 
-      - name: Set up Python 3.12.7
+      - name: Set up Python 3.12.13
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12.7"
+          python-version: "3.12.13"
 
       - name: Install dependencies
         run: |
