@@ -206,15 +206,21 @@ def train_lstm(
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
     if db_path.startswith("sqlite:///"):
-        db_dir = db_path.replace("sqlite:///", "").split("/")[0]
+        db_dir = db_path.replace("sqlite:///", "").rsplit("/", 1)[0]
         if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir)
+            os.makedirs(db_dir, exist_ok=True)
 
+    # Setup Tracking URI
     mlflow.set_tracking_uri(db_path)
     
+    # Cleaning Environment Variables to Prevent Conflict with Previous Runs
     for _env in ("MLFLOW_RUN_ID", "MLFLOW_PARENT_RUN_ID"):
         os.environ.pop(_env, None)
 
+    # So TensorFlow Can Recognize TensorBoard 
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2" 
+
+    # 5. Inisialisasi Eksperimen
     exp = mlflow.get_experiment_by_name(experiment_name)
     if exp is None:
         exp_id = mlflow.create_experiment(experiment_name)
