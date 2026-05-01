@@ -34,7 +34,6 @@ jobs:
         run: mkdir -p mlruns
 
       - name: Run MLflow Project
-        # Menjalankan modelling.py langsung untuk menghindari isu path di mlflow run
         run: |
           python MLProject/modelling.py --data_file MLProject/preprocessed_bitcoin_data.csv --epochs 2
 
