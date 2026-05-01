@@ -27,8 +27,9 @@ from tensorflow.keras.layers import LSTM, Dense
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-
-DEFAULT_DATA_FILE = "data/btcusd_1-min_data.csv"
+MLFLOW_DB_PATH = "sqlite:///mlruns/mlflow.db"
+EXPERIMENT_NAME = "Bitcoin Price Prediction"
+DEFAULT_DATA_FILE = "MLProject/preprocessed_bitcoin_data.csv"
 DEFAULT_MAX_SAMPLES = 15_000
 DEFAULT_LOOK_BACK = 60
 DEFAULT_EPOCHS = 10
