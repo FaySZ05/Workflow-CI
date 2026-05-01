@@ -34,12 +34,13 @@ DEFAULT_LOOK_BACK = 60
 DEFAULT_EPOCHS = 10
 DEFAULT_BATCH_SIZE = 32
 DEFAULT_TEST_SIZE = 0.2
-MLFLOW_DB_PATH = "sqlite:///mlruns/mlflow.db"
 EXPERIMENT_NAME = "Bitcoin Price Prediction"
 
 FEATURES = ["Open", "High", "Low", "Close", "Volume"]
 TARGET = "High"
-
+db_dir = "mlruns"
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
 
 # ---------------------------------------------------------------------------
 # Data loading & preprocessing
@@ -203,9 +204,13 @@ def train_lstm(
 # ---------------------------------------------------------------------------
 
 def setup_mlflow(db_path: str, experiment_name: str) -> str:
+    if db_path.startswith("sqlite:///"):
+        db_dir = db_path.replace("sqlite:///", "").split("/")[0]
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir)
+
     mlflow.set_tracking_uri(db_path)
-    # `mlflow run` may set MLFLOW_RUN_ID / MLFLOW_PARENT_RUN_ID for the backend run.
-    # We create our own runs in this script, so clear these to avoid RESOURCE_DOES_NOT_EXIST.
+    
     for _env in ("MLFLOW_RUN_ID", "MLFLOW_PARENT_RUN_ID"):
         os.environ.pop(_env, None)
 
@@ -214,9 +219,8 @@ def setup_mlflow(db_path: str, experiment_name: str) -> str:
         exp_id = mlflow.create_experiment(experiment_name)
     else:
         exp_id = exp.experiment_id
+    
     mlflow.set_experiment(experiment_name)
-    print(f"MLflow tracking URI : {db_path}")
-    print(f"Experiment          : {experiment_name}  (id={exp_id})")
     return exp_id
 
 
@@ -226,72 +230,28 @@ def setup_mlflow(db_path: str, experiment_name: str) -> str:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Bitcoin price prediction models.")
-    parser.add_argument("--data_file", type=str, default=DEFAULT_DATA_FILE,
-                        help="Path to the CSV data file.")
-    parser.add_argument("--max_samples", type=int, default=DEFAULT_MAX_SAMPLES,
-                        help="Maximum number of rows to use (RAM guard).")
-    parser.add_argument("--look_back", type=int, default=DEFAULT_LOOK_BACK,
-                        help="Sequence length for LSTM input.")
-    parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS,
-                        help="Training epochs for LSTM.")
-    parser.add_argument("--batch_size", type=int, default=DEFAULT_BATCH_SIZE,
-                        help="Batch size for LSTM training.")
-    parser.add_argument("--test_size", type=float, default=DEFAULT_TEST_SIZE,
-                        help="Fraction of data reserved for testing.")
-    parser.add_argument("--mlflow_db", type=str, default=MLFLOW_DB_PATH,
-                        help="MLflow backend store URI.")
-    parser.add_argument("--experiment", type=str, default=EXPERIMENT_NAME,
-                        help="MLflow experiment name.")
-    parser.add_argument("--skip_lstm", action="store_true",
-                        help="Skip LSTM training (faster, no TensorFlow needed).")
+    parser.add_argument("--data_file", type=str, default=DEFAULT_DATA_FILE)
+    parser.add_argument("--max_samples", type=int, default=DEFAULT_MAX_SAMPLES)
+    parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS)
     return parser.parse_args()
 
-
-def main():
-    args = parse_args()
-
-    # ── MLflow ──────────────────────────────────────────────────────────────
-    os.makedirs("mlruns", exist_ok=True)
-    exp_id = setup_mlflow(args.mlflow_db, args.experiment)
-
-    # ── Data ────────────────────────────────────────────────────────────────
-    df = load_data(args.data_file, args.max_samples)
-
-    # Flat splits (sklearn models)
-    X_train, X_test, y_train, y_test = build_flat_splits(df, args.test_size)
-    print(f"Flat splits  — train: {X_train.shape}  test: {X_test.shape}")
-
-    # ── Train sklearn models ─────────────────────────────────────────────────
-    train_linear_regression(X_train, X_test, y_train, y_test, exp_id)
-    train_random_forest(X_train, X_test, y_train, y_test, exp_id)
-
-    # Free flat arrays before sequence work
-    del X_train, X_test, y_train, y_test
-    gc.collect()
-
-    # ── Train LSTM ──────────────────────────────────────────────────────────
-    if not args.skip_lstm:
-        (X_train_seq, X_test_seq,
-         y_train_seq, y_test_seq,
-         scaler, high_idx) = build_sequence_splits(df, args.look_back, args.test_size)
-
-        print(f"Sequence splits — train: {X_train_seq.shape}  test: {X_test_seq.shape}")
-
-        train_lstm(
-            X_train_seq, X_test_seq,
-            y_train_seq, y_test_seq,
-            scaler, high_idx,
-            look_back=args.look_back,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            experiment_id=exp_id,
-        )
-    else:
-        print("Skipping LSTM training (--skip_lstm flag set).")
-
-    print("\nAll runs complete. Start the MLflow UI with:")
-    print(f"  mlflow ui --backend-store-uri {args.mlflow_db}")
-
-
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    
+    # 1. Setup
+    eid = setup_mlflow(MLFLOW_DB_PATH, EXPERIMENT_NAME)
+    df = load_data(args.data_file, args.max_samples)
+    
+    # 2. Sklearn Models (Linear & Random Forest)
+    X_train, X_test, y_train, y_test = build_flat_splits(df, DEFAULT_TEST_SIZE)
+    train_linear_regression(X_train, X_test, y_train, y_test, eid)
+    train_random_forest(X_train, X_test, y_train, y_test, eid)
+    
+    # 3. Deep Learning Model (LSTM)
+    X_train_seq, X_test_seq, y_train_seq, y_test_seq, scaler, h_idx = build_sequence_splits(
+        df, DEFAULT_LOOK_BACK, DEFAULT_TEST_SIZE
+    )
+    train_lstm(X_train_seq, X_test_seq, y_train_seq, y_test_seq, scaler, h_idx, 
+               DEFAULT_LOOK_BACK, args.epochs, DEFAULT_BATCH_SIZE, eid)
+    
+    print("All models trained and tracked successfully!")
