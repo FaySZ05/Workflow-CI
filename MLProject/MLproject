@@ -1,9 +1,14 @@
 name: bitcoin-price-prediction
+
 conda_env: conda.yaml 
 
 entry_points:
   main:
     parameters:
-      data_file: {type: path}
-      epochs: {type: int, default: 5}
+      data_file: 
+        type: path
+        default: "preprocessed_bitcoin_data.csv"
+      epochs: 
+        type: int 
+        default: 5
     command: "python modelling.py --data_file {data_file} --epochs {epochs}"
