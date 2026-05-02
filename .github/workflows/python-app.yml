@@ -31,9 +31,8 @@ jobs:
       - name: Run MLflow Project
         shell: bash -l {0}
         run: |
-          mlflow run . --experiment-name "Bitcoin Price Prediction" \
-             -P epochs=2 \
-             -P data_file="MLProject/preprocessed_bitcoin_data.csv"
+          mlflow run MLProject/ --experiment-name "Bitcoin Price Prediction" -P epochs=2
+
 
       - name: Upload MLflow Artifacts
         if: always()
