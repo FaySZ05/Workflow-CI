@@ -2,11 +2,9 @@ name: CI MLflow
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
+  pull_request: 
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -16,61 +14,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          lfs: true # Penting untuk file CSV besar jika ada
+          lfs: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: "3.10" # Versi 3.10 paling stabil untuk kombinasi TF + MLflow saat ini
+          auto-update-conda: true
+          python-version: "3.10"
 
-      - name: Install dependencies
+      - name: Install MLflow & Dependencies
+        shell: bash -l {0}
         run: |
-          python -m pip install --upgrade pip
-          # Menambahkan tensorboard untuk memperbaiki 'TBNotInstalledError'
-          # Menambahkan skops untuk menghindari warning keamanan model scikit-learn
-          pip install mlflow tensorflow tensorboard numpy cloudpickle pandas scikit-learn h5py skops
-
-      - name: Create MLflow Directories
-        run: mkdir -p mlruns
+          pip install mlflow==3.11.1 conda-build
 
       - name: Run MLflow Project
+        shell: bash -l {0}
         run: |
-          python MLProject/modelling.py --data_file MLProject/preprocessed_bitcoin_data.csv --epochs 2
-
-      - name: Get latest MLflow run id
-        if: always()
-        run: |
-          python <<'PY'
-          import os
-          import mlflow
-          from mlflow.tracking import MlflowClient
-
-          # Menentukan URI tracking ke folder lokal mlruns
-          uri = "file://" + os.path.join(os.getcwd(), "mlruns")
-          client = MlflowClient(tracking_uri=uri)
-          
-          try:
-              exp_name = "Bitcoin Price Prediction"
-              exp = client.get_experiment_by_name(exp_name)
-              
-              if not exp:
-                  exps = client.search_experiments()
-                  if exps:
-                      exp = exps[0]
-                  else:
-                      print("No experiments found.")
-                      exit(0)
-
-              runs = client.search_runs([exp.experiment_id])
-              if runs:
-                  latest_run = max(runs, key=lambda r: r.info.start_time)
-                  run_id = latest_run.info.run_id
-                  with open(os.environ["GITHUB_ENV"], "a") as f:
-                      f.write(f"RUN_ID={run_id}\n")
-                  print(f"Latest Run ID set to: {run_id}")
-          except Exception as e:
-              print(f"Error retrieving run ID: {e}")
-          PY
+          mlflow run . --experiment-name "Bitcoin Price Prediction" \
+             -P epochs=2 \
+             -P data_file="MLProject/preprocessed_bitcoin_data.csv"
 
       - name: Upload MLflow Artifacts
         if: always()
