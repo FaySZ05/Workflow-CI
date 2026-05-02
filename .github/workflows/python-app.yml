@@ -31,10 +31,13 @@ jobs:
       - name: Run MLflow Project
         shell: bash -l {0}
         run: |
+          DATA_PATH="$(pwd)/MLProject/preprocessed_bitcoin_data.csv"
+          ls -l $DATA_PATH
+          
           mlflow run MLProject/ \
             --experiment-name "Bitcoin Price Prediction" \
             -P epochs=2 \
-            -P data_file="preprocessed_bitcoin_data.csv"
+            -P data_file="$DATA_PATH"
 
       - name: Upload MLflow Artifacts
         if: always()
